@@ -6,8 +6,8 @@
 
 (set! *warn-on-reflection* true)
 
-;; (defn create-executor []
-;;   (Dispatch/getGlobalQueue Dispatch/DEFAULT))
+(defn create-executor []
+  (Dispatch/getGlobalQueue Dispatch/DEFAULT))
 
 ;; (defn ^DispatchQueue create-dispatch-queue [name]
 ;;   (Dispatch/createQueue name))
@@ -27,13 +27,6 @@
 
 (defn merge-data [^DispatchSource ds event]
   (HawtUtil/merge ds event))
-
-;; (defn wrap-in-dq [f next]
-;;   (let [dq (create-dispatch-queue "test")
-;; 	ds (create-dispatch-source dq)]
-;;     (.setEventHandler ds #(doall (map (if next (comp next f) f) (.getData ds))))
-;;     (.resume ds)
-;;     (partial merge-data ds)))
 
 (defn wrap-in-dq [f next]
   (let [dq (HawtUtil/createDispatchQueue "test")

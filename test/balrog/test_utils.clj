@@ -75,4 +75,11 @@
 (defn create-nack-frame-no-message-id [q-name id]
   (stomp-frame :nack {:destination q-name :id id} ""))
 
+;; Begin
+(defn create-bad-begin-frame []
+  (stomp-frame :begin {} ""))
+
+(defn create-valid-begin-frame [txn-id]
+  (stomp-frame :begin {:transaction txn-id} ""))
+
 

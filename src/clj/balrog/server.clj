@@ -1,6 +1,7 @@
 (ns balrog.server
   (:use [balrog.netty :as netty]
 	balrog.stomp)
+  (:import (org.jboss.netty.channel Channel))
   (:require [clojure.contrib.logging :as logging]))
 
 (set! *warn-on-reflection* true)
@@ -45,22 +46,29 @@
   (exception [this ctx event])
   (disconnected [this ctx event]))
 
+(defn dispatch-msg [state msg]
+  (let [handler (:handler state)
+	conn (:conn state)
+	[new-conn response] (handler conn msg)]
+    (when-not (=  :nil (:command response))
+      (.write ^Channel (:channel @conn) response))
+    state))
+
 (defn delegating-handler [handler]
-  (let [conn (atom (create-connection :not-connected nil))]
-    (defhandler1
-      (connect [ctx event] (swap! conn assoc :channel (.getChannel event)))
+  (let [conn (atom (create-connection :not-connected nil))
+	dispatcher (agent {:handler handler :conn conn})]
+    (def-netty-handler
+      (connect [ctx event]
+        (swap! conn assoc :channel (.getChannel event)))
       (message [ctx event]
-	       (let [channel (.getChannel event)
-		     message (.getMessage event)
-		     [new-conn-state response] (handler conn message)]
-		 (when-not (= :nil (:command response))
-		   (logging/debug "Response:" response)
-		   (.write channel response))))
+        (send dispatcher dispatch-msg (.getMessage event)))
       (exception [ctx event]
-		 (logging/error (.getCause event) "ERROR")
-		 (clean-up (.getChannel event))
-		 (.. event getChannel close))
-      (disconnected [ctx event] (logging/debug "DISCONNECTED")))))
+        (logging/error (.getCause event) "ERROR")
+	(clean-up (.getChannel event))
+	(.. event getChannel close))
+      (disconnected [ctx event]
+        (logging/debug "DISCONNECTED")
+	(clean-up (.getChannel event))))))
 
 ;; Our pipeline
 (defn create-balrog-pipeline [handler]

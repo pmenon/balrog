@@ -2,7 +2,7 @@
   (:use balrog.executor)
   (:import (java.util.concurrent Executors)
 	   (java.net InetSocketAddress)
-           (org.jboss.netty.channel Channels ChannelEvent ChannelHandlerContext ChannelPipelineFactory ChannelStateEvent ChannelUpstreamHandler ChannelDownstreamHandler ExceptionEvent MessageEvent SimpleChannelHandler)
+           (org.jboss.netty.channel Channels ChannelEvent ChannelHandler ChannelHandlerContext ChannelPipelineFactory ChannelStateEvent ChannelUpstreamHandler ChannelDownstreamHandler ExceptionEvent MessageEvent SimpleChannelHandler StaticChannelPipeline)
 	   (org.jboss.netty.channel.socket.nio NioServerSocketChannelFactory)
 	   (org.jboss.netty.bootstrap ServerBootstrap)
 	   (org.jboss.netty.handler.codec.frame FrameDecoder Delimiters DelimiterBasedFrameDecoder)
@@ -21,7 +21,7 @@
 		      (f context event))))
 
 
-(defmacro defhandler1 [& forms]
+(defmacro def-netty-handler [& forms]
   (let [defaults ['(connect [ctx event] )
 		  '(message [ctx event] )
 		  '(exception [ctx event] )
@@ -52,7 +52,7 @@
 		(cast org.jboss.netty.channel.ExceptionEvent ~'generic-event)]
 	    (do ~@(get syms 'exception) nil)))))))
 
-(defmacro defhandler [& forms]
+(defmacro defhandler1 [& forms]
   (let [defaults ['(connect [ctx event] (proxy-super channelConnected ctx event))
 		  '(message [ctx event] (proxy-super messagedReceived ctx event))
 		  '(exception [ctx event] (proxy-super exceptionCaught ctx event))
@@ -114,11 +114,10 @@
 
 (defn nio-server-bootstrap []
   (let [boss-executor (virtual-executor clojure.lang.Agent/soloExecutor)
-	worker-executor (virtual-executor clojure.lang.Agent/soloExecutor)
+	worker-executor (virtual-executor clojure.lang.Agent/pooledExecutor)
 	executor (Executors/newCachedThreadPool)]
-    (doto (ServerBootstrap.
-	   (NioServerSocketChannelFactory. executor executor))
-      (.setOption "reuseAddress" true))))
+    (ServerBootstrap.
+     (NioServerSocketChannelFactory. executor executor))))
 
 (defn bind [bootstrap port]
   (.bind bootstrap (InetSocketAddress. port)))

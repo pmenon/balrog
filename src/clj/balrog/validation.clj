@@ -84,3 +84,6 @@
     [conn
      (cond
       (not txn-id) (error-frame {} "Error: Transaction ID is required for ABORT frames."))]))
+
+(defmethod validate :disconnect [broker conn frame]
+  [conn frame])

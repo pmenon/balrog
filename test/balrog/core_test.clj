@@ -125,7 +125,7 @@
       ; unsubscribe so the nack won't requeue with us
       (on-unsubscribe broker conn unsubscribe-frame)
       (let [pending-acks-before (get-in @conn [:pending-acks 999])
-	    ack-message-id (get-in (first pending-acks) [:headers :message-id])
+	    ack-message-id (get-in (first pending-acks-before) [:headers :message-id])
 	    nack-frame (create-nack-frame "/queue/test" 999 ack-message-id)
 	    response (on-nack broker conn nack-frame)
 	    pending-acks-after (get-in @conn [:pending-acks 999])]

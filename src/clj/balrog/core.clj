@@ -6,7 +6,8 @@
 	balrog.subscription
 	balrog.util
 	balrog.validation)
-  (:require [clojure.contrib.logging :as logging])
+  (:require [clojure.contrib.logging :as logging]
+	    [clojure.contrib.core :as core])
   (:import (org.jboss.netty.channel Channel)
 	   (org.fusesource.hawtdispatch DispatchSource EventAggregators))
   (:gen-class))
@@ -18,7 +19,7 @@
 (defn init-balrog []
   {:supported-versions #{1.1 1.0}
    :welcome-message "You're hooked up with Balrog, baby!"
-   :executor (clojure.lang.Agent/pooledExecutor)
+   ;:executor (clojure.lang.Agent/pooledExecutor)
    :queues (atom {})})
 
 (defn is-supported? [versions client-version]
@@ -48,9 +49,9 @@
       (let [receipt (-> stomp-message :headers :receipt)
 	    queue (get-or-create-queue! broker destination)]
 	    ;stomp-message (assoc-in stomp-message [:headers :message-id] (generateUUID))]
-	(execute (:executor broker) #(enqueue queue stomp-message))
+	;(execute (:executor broker) #(enqueue queue stomp-message))
 	;(future (enqueue queue stomp-message))
-        ;(enqueue queue stomp-message)
+        (enqueue queue stomp-message)
 	(if receipt
 	  (create-frame :receipt {:receipt-id receipt} "Your message was sent, son!")
 	  (nop-frame))))))
@@ -162,7 +163,7 @@
 (defn on-commit [broker connection stomp-message]
   (let [txn-id (-> stomp-message :headers :transaction)
         txn-messages (get-in @connection [:txns txn-id])]
-    (reduce #(handle-frame broker connection %2) txn-messages)))
+    (map #(handle-frame broker connection (core/dissoc-in % [:headers :transaction])) txn-messages)))
 
 (defn on-abort [broker connection stomp-message]
   (let [txn-id (-> stomp-message :headers :transaction)]
@@ -202,13 +203,22 @@
       [conn (error-frame {} "Error: Connection is not allowed access to this operation")]
       (next conn frame))))
 
-(defn create-broker []
+(defn create-request-handler []
   (let [broker (init-balrog)]
     (-> (partial handle-frame broker)
 	(wrap-logging)
 	(wrap-validation broker)
 	(wrap-security broker (fn [_ _ _] true)))))
 
+;; (defn async-broker [request-handler]
+;;   (let [executor (clojure.lang.Agent/pooledExecutor)]
+;;     (fn [conn msg]
+;;       (execute executor (fn []
+;; 			 (let [[new-conn response] (request-handler conn msg)]
+;; 			   (when-not (= :nil (:command response))
+;; 			     (.write ^Channel (:channel @conn) response))))))))
+
 (defn -main [& args]
-  (logging/info "Starting BalrogQ Stomp server on port 61613 ...")
-  (create-balrog-server (create-broker) 61613))
+  (let [request-handler (create-request-handler)]
+    (logging/info "Starting BalrogQ Stomp server on port 61613 ...")
+    (create-balrog-server request-handler 61613)))

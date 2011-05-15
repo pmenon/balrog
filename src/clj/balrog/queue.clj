@@ -132,6 +132,5 @@
 	  (atom clojure.lang.PersistentQueue/EMPTY)
 	  (atom {})
 	  nil))
-	  ;(wrap-in-dq do-enqueue nil)))
 
 
