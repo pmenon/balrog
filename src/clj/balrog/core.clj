@@ -14,12 +14,20 @@
 
 (set! *warn-on-reflection* true)
 
+;; TODO: Each of the handler functions need not be aware that
+;;       the connection is a reference.  We need to stop treating it as such!
+
+;; TODO: Add more dang comments!
+
+;; The port we're going to listen on
+(def *balrog-port* 61613)
+
 (declare handle-frame)
 
+;; This is going to become more complicated!
 (defn init-balrog []
   {:supported-versions #{1.1 1.0}
    :welcome-message "You're hooked up with Balrog, baby!"
-   ;:executor (clojure.lang.Agent/pooledExecutor)
    :queues (atom {})})
 
 (defn is-supported? [versions client-version]
@@ -48,9 +56,7 @@
       (error-frame {} "Error: Destination is required for send frames.")
       (let [receipt (-> stomp-message :headers :receipt)
 	    queue (get-or-create-queue! broker destination)]
-	    ;stomp-message (assoc-in stomp-message [:headers :message-id] (generateUUID))]
-	;(execute (:executor broker) #(enqueue queue stomp-message))
-	;(future (enqueue queue stomp-message))
+	;; Enqueue the message!
         (enqueue queue stomp-message)
 	(if receipt
 	  (create-frame :receipt {:receipt-id receipt} "Your message was sent, son!")
@@ -163,7 +169,9 @@
 (defn on-commit [broker connection stomp-message]
   (let [txn-id (-> stomp-message :headers :transaction)
         txn-messages (get-in @connection [:txns txn-id])]
-    (map #(handle-frame broker connection (core/dissoc-in % [:headers :transaction])) txn-messages)))
+    (map #(handle-frame broker
+			connection
+			(core/dissoc-in % [:headers :transaction])) txn-messages)))
 
 (defn on-abort [broker connection stomp-message]
   (let [txn-id (-> stomp-message :headers :transaction)]
@@ -210,15 +218,7 @@
 	(wrap-validation broker)
 	(wrap-security broker (fn [_ _ _] true)))))
 
-;; (defn async-broker [request-handler]
-;;   (let [executor (clojure.lang.Agent/pooledExecutor)]
-;;     (fn [conn msg]
-;;       (execute executor (fn []
-;; 			 (let [[new-conn response] (request-handler conn msg)]
-;; 			   (when-not (= :nil (:command response))
-;; 			     (.write ^Channel (:channel @conn) response))))))))
-
 (defn -main [& args]
   (let [request-handler (create-request-handler)]
     (logging/info "Starting BalrogQ Stomp server on port 61613 ...")
-    (create-balrog-server request-handler 61613)))
+    (create-balrog-server request-handler *balrog-port*)))
