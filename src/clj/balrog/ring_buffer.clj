@@ -6,8 +6,9 @@
 (extend-protocol Rotatable
   clojure.lang.PersistentQueue
   (lrot [this]
-    (let [p (peek this)]
-      (conj (pop this) p))))
+    (if (> (.size this) 1)
+      (conj (pop this) (peek this))
+      this)))
 
 ;  balrog.subscription.SubscriptionList
 ;  (lrot [this]
